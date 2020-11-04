@@ -12,6 +12,7 @@ class QtAnnotation;
 class QtAnnotationGroup;
 class QDockWidget;
 class QTreeWidget;
+class QTableWidget;
 class QTreeWidgetItem;
 class QObject;
 class QEvent;
@@ -45,14 +46,24 @@ public :
     void clearSelection();
     bool canClose();
 
+signals:
+    void finishLocalFileSaving();
+
 public slots:
     void onNewImageLoaded(std::weak_ptr<MultiResolutionImage> img, std::string fileName);
     void onImageClosed();
     void addAnnotationGroup();
     void onClearButtonPressed();
     void onOptionsButtonPressed();
-    void onLoadButtonPressed(const std::string& filePath = std::string());
-    bool onSaveButtonPressed();
+    void onLoadButtonPressed(const QString& filePath = QString());
+    bool onSaveButtonPressed(const QString& saveFileName = QString());
+
+    void onRemoteGetButtonPressed();
+    void onRemoteSaveButtonPressed();
+
+    void onSetRegionButtonClicked();
+    void onClearRegionButtonClicked();
+
     void onItemNameChanged(QTreeWidgetItem* item, int column);
     void onTreeWidgetItemDoubleClicked(QTreeWidgetItem * item, int column);
     void onTreeWidgetSelectedItemsChanged();
@@ -73,11 +84,13 @@ private :
     QList<QtAnnotationGroup*> _qtAnnotationGroups;
     QDockWidget* _dockWidget;
     QTreeWidget* _treeWidget;
+    QTableWidget* _tableWidget;
     QLabel* _currentAnnotationHeaderLabel;
     QLabel* _currentAnnotationLabel;
     QFrame* _currentAnnotationLine;
     QEvent* _oldEvent;
     std::weak_ptr<MultiResolutionImage> _img;
+    QByteArray _imgCheckSum;
     float _currentPixelArea;
 
     bool shouldClear();
@@ -85,6 +98,7 @@ private :
     void clearTreeWidget();
     void clearAnnotationList();
     void clearQtAnnotations();
+    QByteArray getImageCheckSum(const std::string& fileName);
 
     static unsigned int _annotationIndex;
     static unsigned int _annotationGroupIndex;

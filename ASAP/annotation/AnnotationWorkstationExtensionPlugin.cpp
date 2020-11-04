@@ -42,16 +42,18 @@
 
 #include <numeric>
 #include <iostream>
+#include <HttpClient.h>
 
 unsigned int AnnotationWorkstationExtensionPlugin::_annotationIndex = 0;
 unsigned int AnnotationWorkstationExtensionPlugin::_annotationGroupIndex = 0;
 
 AnnotationWorkstationExtensionPlugin::AnnotationWorkstationExtensionPlugin() :
   WorkstationExtensionPluginInterface(),
-  _generatedAnnotation(NULL),
+  _generatedAnnotation(nullptr),
   _activeAnnotation(NULL),
   _dockWidget(NULL),
   _treeWidget(NULL),
+  _tableWidget(NULL),
   _oldEvent(NULL),
   _currentAnnotationLine(NULL),
   _currentAnnotationLabel(NULL),
@@ -68,22 +70,46 @@ AnnotationWorkstationExtensionPlugin::AnnotationWorkstationExtensionPlugin() :
     _treeWidget->viewport()->installEventFilter(this);
     _treeWidget->setMouseTracking(true);
     _treeWidget->installEventFilter(this);
+    _tableWidget = _dockWidget->findChild<QTableWidget*>("tableWidget");
+    _tableWidget->setRowCount(4);
+    _tableWidget->setColumnCount(2);
+    _tableWidget->verticalHeader()->hide();
+    _tableWidget->setItem(0, 0, new QTableWidgetItem("Upper Left XY"));
+    _tableWidget->setItem(1, 0, new QTableWidgetItem("Width"));
+    _tableWidget->setItem(2, 0, new QTableWidgetItem("Height"));
+    _tableWidget->setItem(3, 0, new QTableWidgetItem("View Level"));
+//    _tableWidget->setItem(3, 1, new QTableWidgetItem(""));
+    onClearRegionButtonClicked();
+
     QPushButton* groupButton = _dockWidget->findChild<QPushButton*>("addGroupButton");
     QPushButton* clearButton = _dockWidget->findChild<QPushButton*>("clearButton");
     QPushButton* saveButton = _dockWidget->findChild<QPushButton*>("saveButton");
     QPushButton* loadButton = _dockWidget->findChild<QPushButton*>("loadButton");
     QPushButton* optionsButton = _dockWidget->findChild<QPushButton*>("optionsButton");
+
+    auto* remoteGetButton = _dockWidget->findChild<QPushButton*>("remoteGetButton");
+    auto* remoteSaveButton = _dockWidget->findChild<QPushButton*>("remoteSaveButton");
+    auto* setRegionButton = _dockWidget->findChild<QPushButton*>("setRegionButton");
+    auto* clearRegionButton = _dockWidget->findChild<QPushButton*>("clearRegionButton");
+
     _currentAnnotationLine = _dockWidget->findChild<QFrame*>("currentAnnotationLine");
     _currentAnnotationLabel = _dockWidget->findChild<QLabel*>("currentAnnotationLabel");
     _currentAnnotationHeaderLabel = _dockWidget->findChild<QLabel*>("currentAnnotationHeaderLabel");
-    _currentAnnotationLine->setVisible(false);
-    _currentAnnotationLabel->setVisible(false);
-    _currentAnnotationHeaderLabel->setVisible(false);
+    _currentAnnotationLine->setVisible(true);
+    _currentAnnotationLabel->setVisible(true);
+    _currentAnnotationHeaderLabel->setVisible(true);
+
+    // button signals
     connect(groupButton, SIGNAL(clicked()), this, SLOT(addAnnotationGroup()));
     connect(clearButton, SIGNAL(clicked()), this, SLOT(onClearButtonPressed()));
     connect(saveButton, SIGNAL(clicked()), this, SLOT(onSaveButtonPressed()));
     connect(loadButton, SIGNAL(clicked()), this, SLOT(onLoadButtonPressed()));
     connect(optionsButton, SIGNAL(clicked()), this, SLOT(onOptionsButtonPressed()));
+    connect(remoteGetButton, SIGNAL(clicked()), this, SLOT(onRemoteGetButtonPressed()));
+    connect(remoteSaveButton, SIGNAL(clicked()), this, SLOT(onRemoteSaveButtonPressed()));
+    connect(setRegionButton, SIGNAL(clicked()), this, SLOT(onSetRegionButtonClicked()));
+    connect(clearRegionButton, SIGNAL(clicked()), this, SLOT(onClearRegionButtonClicked()));
+
     connect(_treeWidget, SIGNAL(itemChanged(QTreeWidgetItem*, int)), this, SLOT(onItemNameChanged(QTreeWidgetItem*, int)));
     connect(_treeWidget, SIGNAL(itemDoubleClicked(QTreeWidgetItem*, int)), this, SLOT(onTreeWidgetItemDoubleClicked(QTreeWidgetItem*, int)));
     connect(_treeWidget, SIGNAL(itemSelectionChanged()), this, SLOT(onTreeWidgetSelectedItemsChanged()));
@@ -335,13 +361,15 @@ bool AnnotationWorkstationExtensionPlugin::shouldClear() {
   return shouldClear;
 }
 
-void AnnotationWorkstationExtensionPlugin::onLoadButtonPressed(const std::string& filePath) {
+void AnnotationWorkstationExtensionPlugin::onLoadButtonPressed(const QString& filePath) {
+  std::cout << tr("Try to read annotation from %1").arg(filePath).toStdString() << std::endl;
+
   QString fileName;
-  if (filePath.empty()) {
+  if (filePath.isEmpty()) {
     fileName = QFileDialog::getOpenFileName(NULL, tr("Load annotations"), _settings->value("lastOpenendPath", QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)).toString(), tr("Annotation files (*.xml *.ndpa)"));
   }
   else {
-    fileName = QString::fromStdString(filePath);
+    fileName = filePath;
   }
   if (!fileName.isEmpty()) {
     if (!shouldClear()) {
@@ -485,16 +513,23 @@ void AnnotationWorkstationExtensionPlugin::onLoadButtonPressed(const std::string
   }
 }
 
-bool AnnotationWorkstationExtensionPlugin::onSaveButtonPressed() {
-  QDir defaultName = _settings->value("lastOpenendPath", QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)).toString();
-  QString basename = QFileInfo(_settings->value("currentFile", QString()).toString()).completeBaseName();
-  if (basename.isEmpty()) {
-    basename = QString("annotation.xml");
+bool AnnotationWorkstationExtensionPlugin::onSaveButtonPressed(const QString& saveFileName) {
+  QString fileName;
+  if (saveFileName.isEmpty()) {
+    QDir defaultName = _settings->value("lastOpenendPath", QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)).toString();
+    QString basename = QFileInfo(_settings->value("currentFile", QString()).toString()).completeBaseName();
+    if (basename.isEmpty()) {
+      basename = QString("annotation.xml");
+    }
+    else {
+      basename += QString(".xml");
+    }
+    fileName = QFileDialog::getSaveFileName(NULL, tr("Save annotations"), defaultName.filePath(basename), tr("XML file (*.xml);;TIF file (*.tif);;All files (*)"));
   }
   else {
-    basename += QString(".xml");
+    fileName = saveFileName;
   }
-  QString fileName = QFileDialog::getSaveFileName(NULL, tr("Save annotations"), defaultName.filePath(basename), tr("XML file (*.xml);;TIF file (*.tif);;All files (*)"));
+
   if (fileName.endsWith(".tif")) {
     if (std::shared_ptr<MultiResolutionImage> local_img = _img.lock()) {
       std::vector<std::shared_ptr<AnnotationGroup> > grps = this->_annotationService->getList()->getGroups();
@@ -572,6 +607,7 @@ bool AnnotationWorkstationExtensionPlugin::onSaveButtonPressed() {
     }
     else {
       _annotationService->getList()->resetModifiedStatus();
+      emit finishLocalFileSaving();
       return true;
     }
   }
@@ -687,8 +723,10 @@ void AnnotationWorkstationExtensionPlugin::onNewImageLoaded(std::weak_ptr<MultiR
     std::string annotationPath = fileName;
     core::changeExtension(annotationPath, "xml");
     if (core::fileExists(annotationPath)) {
-      onLoadButtonPressed(annotationPath);
+      onLoadButtonPressed(QString::fromStdString(annotationPath));
     }
+    _imgCheckSum = getImageCheckSum(fileName);
+    std::cout << _imgCheckSum.toHex().toStdString() << std::endl;
   }
   if (std::shared_ptr<MultiResolutionImage> local_img = _img.lock()) {
     std::vector<double> spacing = local_img->getSpacing();
@@ -786,9 +824,9 @@ void AnnotationWorkstationExtensionPlugin::startAnnotation(float x, float y, con
 
 void AnnotationWorkstationExtensionPlugin::updateGeneratingAnnotationLabel(QtAnnotation* annotation) {
   if (annotation) {
-    _currentAnnotationLine->setVisible(true);
-    _currentAnnotationLabel->setVisible(true);
-    _currentAnnotationHeaderLabel->setVisible(true);
+//    _currentAnnotationLine->setVisible(true);
+//    _currentAnnotationLabel->setVisible(true);
+//    _currentAnnotationHeaderLabel->setVisible(true);
     unsigned int nrPoints = annotation->getAnnotation()->getNumberOfPoints();
     float area = annotation->getAnnotation()->getArea();
     QString areaUnit(" pixels.");
@@ -798,9 +836,10 @@ void AnnotationWorkstationExtensionPlugin::updateGeneratingAnnotationLabel(QtAnn
     _currentAnnotationLabel->setText(QString("Total number of control points: ") + QString::number(nrPoints) + QString("<br/>") + QString("Total area: ") + QString::number(area * _currentPixelArea, 'g', 4) + areaUnit);
   }
   else {
-    _currentAnnotationLine->setVisible(false);
-    _currentAnnotationLabel->setVisible(false);
-    _currentAnnotationHeaderLabel->setVisible(false);
+//    _currentAnnotationLine->setVisible(false);
+//    _currentAnnotationLabel->setVisible(false);
+//    _currentAnnotationHeaderLabel->setVisible(false);
+    _currentAnnotationLabel->setText("None");
   }
 }
 
@@ -944,4 +983,57 @@ void AnnotationWorkstationExtensionPlugin::removeAnnotationFromSelection(QtAnnot
 
 QSet<QtAnnotation*> AnnotationWorkstationExtensionPlugin::getSelectedAnnotations() {
   return _selectedAnnotations;
+}
+
+void AnnotationWorkstationExtensionPlugin::onSetRegionButtonClicked() {
+  QRectF FOV = _viewer->mapToScene(_viewer->rect()).boundingRect();
+  float sceneScale = _viewer->getSceneScale();
+  float maxDownsample = 1. / sceneScale;
+  QRectF FOVImage = QRectF(FOV.left() / sceneScale, FOV.top() / sceneScale, FOV.width() / sceneScale, FOV.height() / sceneScale);
+  int level = _img.lock()->getBestLevelForDownSample(maxDownsample / _viewer->transform().m11());
+  QPointF upperLeft = FOVImage.topLeft();
+  _tableWidget->setItem(0, 1, new QTableWidgetItem(tr("(%1, %2)").arg(int(upperLeft.x())).arg(int(upperLeft.y()))));
+  _tableWidget->setItem(1, 1, new QTableWidgetItem(tr("%1").arg(int(FOVImage.width()))));
+  _tableWidget->setItem(2, 1, new QTableWidgetItem(tr("%1").arg(int(FOVImage.height()))));
+  _tableWidget->setItem(3, 1, new QTableWidgetItem(tr("%1").arg(level)));
+
+}
+
+void AnnotationWorkstationExtensionPlugin::onClearRegionButtonClicked() {
+  std::cout << "clear table" << std::endl;
+  _tableWidget->setItem(0, 1, new QTableWidgetItem(""));
+  _tableWidget->setItem(1, 1, new QTableWidgetItem(""));
+  _tableWidget->setItem(2, 1, new QTableWidgetItem(""));
+  _tableWidget->setItem(3, 1, new QTableWidgetItem(""));
+}
+
+void AnnotationWorkstationExtensionPlugin::onRemoteGetButtonPressed() {
+  std::cout << "Draw a new client window." << std::endl;
+  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Download, _imgCheckSum);
+  const QRect availableSize = httpClient.screen()->availableGeometry();
+  httpClient.resize(availableSize.width() / 3, availableSize.height() / 3);
+  httpClient.move((availableSize.width() - httpClient.width()) / 2, (availableSize.height() - httpClient.height()) / 2);
+  connect(&httpClient, &HttpClient::receivedFileDstChanged, this, &AnnotationWorkstationExtensionPlugin::onLoadButtonPressed);
+  httpClient.exec();
+}
+
+void AnnotationWorkstationExtensionPlugin::onRemoteSaveButtonPressed() {
+  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Upload, _imgCheckSum);
+  const QRect availableSize = httpClient.screen()->availableGeometry();
+  httpClient.resize(availableSize.width() / 3, availableSize.height() / 3);
+  httpClient.move((availableSize.width() - httpClient.width()) / 2, (availableSize.height() - httpClient.height()) / 2);
+  connect(&httpClient, SIGNAL(uploadStarted(const QString&)), this, SLOT(onSaveButtonPressed(const QString&)));
+  connect(this, &AnnotationWorkstationExtensionPlugin::finishLocalFileSaving, &httpClient, &HttpClient::uploadFile);
+  httpClient.exec();
+}
+
+QByteArray AnnotationWorkstationExtensionPlugin::getImageCheckSum(const std::string& fileName) {
+  QFile f(QString::fromStdString(fileName));
+  if (f.open(QFile::ReadOnly)) {
+    QCryptographicHash hash(QCryptographicHash::Algorithm::Md5);
+    if (hash.addData(&f)) {
+      return hash.result();
+    }
+  }
+  return QByteArray();
 }

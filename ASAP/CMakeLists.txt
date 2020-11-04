@@ -30,9 +30,11 @@ set(SOURCE
     ScaleBar.cpp
     UtilityFunctions.cpp
     QtProgressMonitor.cpp
-)
+        HttpClient.cpp HttpClient.h)
 
 find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL UiTools Concurrent)
+find_package(Qt5 COMPONENTS Network REQUIRED)
+find_package(Qt5 COMPONENTS Xml REQUIRED)
 set(RESOURCE
     resources/ASAP_resources.qrc
 )
@@ -46,6 +48,9 @@ add_executable(ASAP main.cpp ASAP.rc ${RESOURCE_ADDED})
 target_link_libraries(ASAPLib PUBLIC basicfilters PRIVATE multiresolutionimageinterface Qt5::Widgets Qt5::Core Qt5::OpenGL Qt5::UiTools)
 target_include_directories(ASAPLib PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}> $<INSTALL_INTERFACE:include/ASAP> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:include/ASAP>)
 target_link_libraries(ASAP PRIVATE ASAPLib Qt5::Core Qt5::Widgets)
+target_link_libraries(ASAP Qt5::Network)
+target_link_libraries(ASAP Qt5::Xml)
+
 set_target_properties(ASAPLib PROPERTIES DEBUG_POSTFIX _d)
 set_target_properties(ASAP PROPERTIES DEBUG_POSTFIX _d)
 
