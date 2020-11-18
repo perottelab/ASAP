@@ -7,22 +7,24 @@
 #include <QtCore/QFileInfo>
 #include <QtWidgets/QDialogButtonBox>
 #include <QtWidgets/QMessageBox>
-#include <QtGui/QDesktopServices>
 #include <QPushButton>
 #include <QDir>
 #include "HttpClient.h"
 #include <iostream>
 #include <QtXml/QDomDocument>
+#include <QUrlQuery>
 
 const char defaultUrl[] = "http://127.0.0.1:5000/annotation";
 const char defaultFileName[] = "annotation.xml";
 
-HttpClient::HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSum)
+HttpClient::HttpClient(QWidget *parent, WorkMode workMode, const QByteArray& imgCheckSum, QTableWidget* tableWidget)
         : QDialog(parent)
         , workMode(workMode)
         , imgCheckSum(imgCheckSum)
+        , tableWidget(tableWidget)
         , statusLabel(new QLabel(tr("Please enter the URL endpoint of this HTTP Request.\n\n"), this))
         , urlLineEdit(new QLineEdit(defaultUrl))
+        , argsTextEdit(new QTextEdit(""))
         , connectButton(new QPushButton(tr("Connect")))
         , launchCheckBox(new QCheckBox("Launch file"))
         , localFileLineEdit(new QLineEdit(defaultFileName))
@@ -32,9 +34,9 @@ HttpClient::HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSu
         , httpRequestAborted(false)
 {
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    titleMap[WorkMode::Download] = QString("HTTP - Download");
+    titleMap[WorkMode::Download] = QString("HTTP - Download Annotations");
     titleMap[WorkMode::Region] = QString("HTTP - Region Detection");
-    titleMap[WorkMode::Upload] = QString("HTTP - Upload");
+    titleMap[WorkMode::Upload] = QString("HTTP - Upload Annotations");
 
     setWindowTitle(titleMap[workMode]);
 
@@ -46,12 +48,17 @@ HttpClient::HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSu
             this, &HttpClient::sslErrors);
     #endif
 
-    QFormLayout *formLayout = new QFormLayout;
+    auto *formLayout = new QFormLayout;
     urlLineEdit->setText(urlLineEdit->text() + "/" + imgCheckSum.toHex());
     urlLineEdit->setClearButtonEnabled(true);
     connect(urlLineEdit, &QLineEdit::textChanged,
             this, &HttpClient::enableConnectButton);
     formLayout->addRow(tr("&URL:"), urlLineEdit);
+
+    argsTextEdit->setReadOnly(true);
+    urlQuery = constructRegionQuery();
+    argsTextEdit->setText(urlQuery.toString().replace("&", "\n"));
+    formLayout->addRow(tr("Request Arguments: "), argsTextEdit);
 
     QString localDirectory = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     if (localDirectory.isEmpty() || !QFileInfo(localDirectory).isDir())
@@ -72,7 +79,7 @@ HttpClient::HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSu
     launchCheckBox->setChecked(true);
     formLayout->addRow(launchCheckBox);
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    auto *mainLayout = new QVBoxLayout(this);
     mainLayout->addLayout(formLayout);
 
     mainLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Ignored, QSizePolicy::MinimumExpanding));
@@ -87,12 +94,12 @@ HttpClient::HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSu
     else if (workMode == Upload)
       connect(connectButton, &QAbstractButton::clicked, this, &HttpClient::initUploadFile);
 
-  QPushButton *quitButton = new QPushButton(tr("Quit"));
+  auto *quitButton = new QPushButton(tr("Quit"));
     quitButton->setAutoDefault(false);
     connect(quitButton, &QAbstractButton::clicked, this, &QWidget::close);
 
     // buttonBox Layout
-    QDialogButtonBox *buttonBox = new QDialogButtonBox;
+    auto *buttonBox = new QDialogButtonBox;
     buttonBox->addButton(quitButton, QDialogButtonBox::RejectRole);
     buttonBox->addButton(connectButton, QDialogButtonBox::ActionRole);
     mainLayout->addWidget(buttonBox);
@@ -123,7 +130,7 @@ void HttpClient::startGetRequest(const QUrl &requestedUrl)
     statusLabel->setText(tr("Connecting to %1...").arg(url.toString()));
 }
 
-void HttpClient::startPostRequest(QNetworkRequest networkRequest, QByteArray dataArray)
+void HttpClient::startPostRequest(const QNetworkRequest& networkRequest, const QByteArray& dataArray)
 {
   httpRequestAborted = false;
 
@@ -149,7 +156,8 @@ QUrl HttpClient::parseUrl() {
 
 void HttpClient::downloadFile()
 {
-    const QUrl newUrl = parseUrl();
+    QUrl newUrl = parseUrl();
+    newUrl.setQuery(urlQuery);
     if (newUrl.isEmpty() || !newUrl.isValid())
       return;
     QString fileName = QString();
@@ -328,10 +336,39 @@ void HttpClient::uploadFile() {
 
   QNetworkRequest request;
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/xml");
-  request.setUrl(parseUrl());
+  QUrl _url = parseUrl();
+  _url.setQuery(urlQuery);
+  request.setUrl(_url);
 
   startPostRequest(request, dataArray);
 
+}
+
+QUrlQuery HttpClient::constructRegionQuery() {
+  QUrlQuery query = QUrlQuery();
+  if (tableWidget) {
+    bool is_empty = false;
+    int row_count = tableWidget->rowCount();
+    for (int row=0; row<row_count; row++) {
+      QString text = tableWidget->item(row, 1)->text();
+      is_empty = is_empty || text == "";
+      if (is_empty)
+        break;
+    }
+    if (!is_empty) {
+      QString xyCoordinates = tableWidget->item(0, 1)->text();
+      QRegularExpression re("([-]?\\d+), ([-]?\\d+)");
+      QRegularExpressionMatch match = re.match(xyCoordinates);
+      if (match.hasMatch()) {
+        query.addQueryItem("x", match.captured(1));
+        query.addQueryItem("y", match.captured(2));
+
+        query.addQueryItem("width", tableWidget->item(1, 1)->text());
+        query.addQueryItem("height", tableWidget->item(2, 1)->text());
+      }
+    }
+  }
+  return query;
 }
 
 #ifndef QT_NO_SSL

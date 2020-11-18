@@ -1009,7 +1009,7 @@ void AnnotationWorkstationExtensionPlugin::onClearRegionButtonClicked() {
 
 void AnnotationWorkstationExtensionPlugin::onRemoteGetButtonPressed() {
   std::cout << "Draw a new client window." << std::endl;
-  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Download, _imgCheckSum);
+  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Download, _imgCheckSum, _tableWidget);
   const QRect availableSize = httpClient.screen()->availableGeometry();
   httpClient.resize(availableSize.width() / 3, availableSize.height() / 3);
   httpClient.move((availableSize.width() - httpClient.width()) / 2, (availableSize.height() - httpClient.height()) / 2);
@@ -1018,7 +1018,7 @@ void AnnotationWorkstationExtensionPlugin::onRemoteGetButtonPressed() {
 }
 
 void AnnotationWorkstationExtensionPlugin::onRemoteSaveButtonPressed() {
-  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Upload, _imgCheckSum);
+  HttpClient httpClient(_dockWidget, HttpClient::WorkMode::Upload, _imgCheckSum, _tableWidget);
   const QRect availableSize = httpClient.screen()->availableGeometry();
   httpClient.resize(availableSize.width() / 3, availableSize.height() / 3);
   httpClient.move((availableSize.width() - httpClient.width()) / 2, (availableSize.height() - httpClient.height()) / 2);

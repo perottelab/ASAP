@@ -13,6 +13,9 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QCheckBox>
+#include <QtWidgets/QTableWidget>
+#include <QUrlQuery>
+#include <QtWidgets/QTextEdit>
 
 class HttpClient : public QDialog {
     Q_OBJECT
@@ -24,7 +27,7 @@ public:
         Region = 0x0003
       };
 
-    HttpClient(QWidget *parent, WorkMode workMode, QByteArray imgCheckSum);
+    HttpClient(QWidget *parent, WorkMode workMode, const QByteArray& imgCheckSum, QTableWidget* tableWidget);
     ~HttpClient();
 
     void startGetRequest(const QUrl &requestedUrl);
@@ -57,8 +60,10 @@ private:
     QCheckBox *launchCheckBox;
     QLineEdit *localFileLineEdit;
     QLineEdit *localDirectoryLineEdit;
+    QTextEdit *argsTextEdit;
 
     QUrl url;
+    QUrlQuery urlQuery;
     QByteArray imgCheckSum;
     QNetworkAccessManager qnam;
     QNetworkReply *reply;
@@ -67,10 +72,13 @@ private:
 
     QMap<WorkMode, QString> titleMap;
     WorkMode workMode;
+    QTableWidget* tableWidget;
 
   QUrl parseUrl();
 
-  void startPostRequest(QNetworkRequest networkRequest, QByteArray dataArray);
+  void startPostRequest(const QNetworkRequest& networkRequest, const QByteArray& dataArray);
+
+  QUrlQuery constructRegionQuery();
 };
 
 
