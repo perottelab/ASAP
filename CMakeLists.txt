@@ -75,8 +75,8 @@ find_package(OPENSLIDE REQUIRED)
 # Build options for the pathology projects
 option(BUILD_EXECUTABLES "Builds executables" ON)
 option(BUILD_ASAP "Builds the ASAP viewer" ON)
-option(BUILD_IMAGEPROCESSING "Builds image processing routines" OFF)
-option(BUILD_TESTS "Builds tests" ON)
+option(BUILD_IMAGEPROCESSING "Builds image processing routines" ON)
+option(BUILD_TESTS "Builds tests" OFF)
 option(PACKAGE_ON_INSTALL "Copies dependent DLLs and packages install" ON)
 
 if(BUILD_IMAGEPROCESSING)

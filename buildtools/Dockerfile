@@ -50,8 +50,11 @@ RUN ln -s /usr/lib/x86_64-linux-gnu/libijg8.so /usr/lib/libijg8.so; exit 0;
 WORKDIR /root
 RUN wget -q https://github.com/zeux/pugixml/archive/v1.9.tar.gz && tar xzf v1.9.tar.gz && rm v1.9.tar.gz && \
     wget -q ftp://dicom.offis.de/pub/dicom/offis/software/dcmtk/dcmtk364/dcmtk-3.6.4.tar.gz && tar xzf dcmtk-3.6.4.tar.gz && mv dcmtk-3.6.4 dcmtk && rm dcmtk-3.6.4.tar.gz
-RUN git clone https://github.com/computationalpathologygroup/ASAP src &&\
-    mkdir build
+
+RUN git clone https://github.com/Auto-annotation-of-Pathology-Images/ASAP src && mkdir build
+
+#COPY ASAP.tar /root/ASAP.tar
+#RUN tar -xf ASAP.tar && mv ASAP src
 
 WORKDIR /root/build      
 COPY build_ASAP.sh /root/build/build_ASAP.sh

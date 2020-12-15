@@ -5,7 +5,7 @@
 #ifndef DIAGPATHOLOGY_HTTPCLIENT_H
 #define DIAGPATHOLOGY_HTTPCLIENT_H
 
-
+#include <memory>
 #include <QtWidgets/QDialog>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QAuthenticator>
