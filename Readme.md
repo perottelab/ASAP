@@ -44,3 +44,25 @@ Subsequently, fire up CMake, point it to a source and build directory and hit Co
 During configuration you will notice that several parts of ASAP can be built seperately (e.g. the viewer). To build this part, simply check the component and hit Configure again. The 'Package on install'-option will allow you to build a binary setup-package like the one provided on the Github-release page. On Windows this requires NSIS to be installed.
 
 After all the dependencies are resolved, hit Generate and CMake will create a Visual Studio Solution or makefile file which can be used to compile the source code.
+
+
+## Changelog for networking branch
+
+The frontend client of AAPI is adapted from ASAP 1.9. Major revision of code is listed below,
+
+* HTTP Client: [HttpClient.cpp](ASAP/HttpClient.cpp) and [HttpClient.h](ASAP/HttpClient.h) are two newly
+added files for creating the HTTP client;
+
+* UI: [AnnotationWorkstationExtensionPlugin.cpp](ASAP/annotation/AnnotationWorkstationExtensionPlugin.cpp) and 
+[AnnotationWorkstationExtensionPlugin.h](ASAP/annotation/AnnotationWorkstationExtensionPlugin.h) are related to the frontend
+UI rendering and SIGNAL/SLOT connection. The Qt-Designer compatible ui file can be found at [AnnotationDockWidget.ui](ASAP/annotation/resources/AnnotationDockWidget.ui).
+
+* Build tools and CMake files: In order to support local compilation of the code, several CMakeList.txt files are modified, 
+    1. [CMakeLists.txt](CMakeLists.txt): change the default compilation options to enable GUI compilation;
+    2. [executables/CMakeLists.txt](executables/CMakeLists.txt): Use UnitTest++ instead of UNITTEST
+    3. [ASAP/annotation/CMakeLists.txt](ASAP/annotation/CMakeLists.txt): turn on CMAKE_AUTOUIC to compile the ui design file;
+    4. [ASAP/CMakeLists.txt](ASAP/CMakeLists.txt): add requirements for Qt Network and Xml; link the HttpClient class;
+    5. [buildtools](buildtools): modify the docker file and the script to package the release as a Ubuntu deb file.
+
+For details, it's recommended to use the "compare" functionality on GitHub to view changes between the networking branch 
+and the forked develop branch.
